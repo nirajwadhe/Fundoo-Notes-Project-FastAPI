@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Depends,HTTPException
 from .models import User, get_db_session
-from .schema import UserRegistrationSchema,UserResponseSchema,UserLoginSchema,BaseResponseModel
+from .schema import UserRegistrationSchema,UserResponseSchema,UserLoginSchema,BaseResponseModel,EmailSchema
 from sqlalchemy.exc import SQLAlchemyError,IntegrityError
 from sqlalchemy.orm import Session
-from .password_utils import get_password_hash,verify_password
-from .jwt_utils import create_token,decode_token
+from core.setting import settings
+# from .password_utils import get_password_hash,verify_password
+# from .jwt_utils import create_token,decode_token,Audience
+from .utils import JwtUtils,PasswordUtils,EmailUtils,Audience
 
 router = FastAPI()
 
@@ -16,7 +18,7 @@ def register_user(user_payload: UserRegistrationSchema, db: Session = Depends(ge
         if existing_user:
             raise HTTPException(status_code=400, detail='Username already registered')
         # Hash the password
-        hashed_password = get_password_hash(user_payload.password)
+        hashed_password = PasswordUtils.get_password_hash(user_payload.password)
         new_user = User(
             username=user_payload.username,
             password=hashed_password,
@@ -27,12 +29,12 @@ def register_user(user_payload: UserRegistrationSchema, db: Session = Depends(ge
         )
         db.add(new_user)
         db.commit()
-        access_token = create_token({"sub": new_user.username})
+        access_token = JwtUtils.create_token({"sub": new_user.username,"aud":Audience.register.value})
+        EmailUtils.send_email(new_user.email,subject="VERIFICATION EMAIL",body=f"http://127.0.0.1:8000/verifyUser?token={access_token}")
         db.refresh(new_user)
         return {"message":"Registered Successfully",
                 "status":201, 
-                "data": new_user,
-                "access_token":access_token}
+                "data": new_user}
     
     except SQLAlchemyError as e:
         db.rollback()
@@ -47,11 +49,22 @@ def register_user(user_payload: UserRegistrationSchema, db: Session = Depends(ge
 def login(user_payload: UserLoginSchema, db: Session = Depends(get_db_session)):
     try :
         user = db.query(User).filter_by(username=user_payload.username).first()
-        if not user or not verify_password(user_payload.password, user.password):
+        if not user or not PasswordUtils.verify_password(user_payload.password, user.password):
             raise HTTPException(status_code=400, detail='Invalid username or password')
+        # access_token = PasswordUtils.create_token({"sub": user.username,"aud":JwtUtils.Audience.login.value}) 
         return {
             "message": "Login successful",
             "status" : 200
         }
     except SQLAlchemyError as e:
-        HTTPException()    
+        raise HTTPException(status_code=500,detail=str(e))    
+            
+@router.get('/verifyUser/')
+def verify_email(token: str,db:Session=Depends(get_db_session)):
+    try: 
+        payload = JwtUtils.decode_token(token=token, audience=Audience.register.value)
+        id = payload.get("id")
+        return {"message": "User Email Verified Successfully", "id":id}
+    
+    except HTTPException as e:
+        raise HTTPException(status_code=401, detail="Invalid or Expired Token")

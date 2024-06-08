@@ -5,5 +5,9 @@ class Settings(BaseSettings):
     DB_URL:str
     SECRET_KEY:str
     ALGORITHM:str
+    EMAIL:str
+    PASSWORD:str
+    SMTP_SERVER:str
+    SMTP_PORT:int
 
 settings = Settings()    
