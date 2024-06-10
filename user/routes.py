@@ -4,8 +4,6 @@ from .schema import UserRegistrationSchema,UserResponseSchema,UserLoginSchema,Ba
 from sqlalchemy.exc import SQLAlchemyError,IntegrityError
 from sqlalchemy.orm import Session
 from core.setting import settings
-# from .password_utils import get_password_hash,verify_password
-# from .jwt_utils import create_token,decode_token,Audience
 from .utils import JwtUtils,PasswordUtils,EmailUtils,Audience
 
 router = FastAPI()
@@ -29,7 +27,7 @@ def register_user(user_payload: UserRegistrationSchema, db: Session = Depends(ge
         )
         db.add(new_user)
         db.commit()
-        access_token = JwtUtils.create_token({"sub": new_user.username,"aud":Audience.register.value})
+        access_token = JwtUtils.create_token({"id": new_user.id,"aud":Audience.register.value})
         EmailUtils.send_email(new_user.email,subject="VERIFICATION EMAIL",body=f"http://127.0.0.1:8000/verifyUser?token={access_token}")
         db.refresh(new_user)
         return {"message":"Registered Successfully",
@@ -51,7 +49,10 @@ def login(user_payload: UserLoginSchema, db: Session = Depends(get_db_session)):
         user = db.query(User).filter_by(username=user_payload.username).first()
         if not user or not PasswordUtils.verify_password(user_payload.password, user.password):
             raise HTTPException(status_code=400, detail='Invalid username or password')
-        # access_token = PasswordUtils.create_token({"sub": user.username,"aud":JwtUtils.Audience.login.value}) 
+        
+        if not user.is_verified:
+            raise HTTPException(status_code=400,detail="User is Not Verified")
+        
         return {
             "message": "Login successful",
             "status" : 200
@@ -64,6 +65,10 @@ def verify_email(token: str,db:Session=Depends(get_db_session)):
     try: 
         payload = JwtUtils.decode_token(token=token, audience=Audience.register.value)
         id = payload.get("id")
+        user = db.query(User).filter(User.id == id).first()
+        if user:
+            user.is_verified = True
+            db.commit()
         return {"message": "User Email Verified Successfully", "id":id}
     
     except HTTPException as e:
