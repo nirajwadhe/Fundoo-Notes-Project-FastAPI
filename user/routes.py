@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Depends,HTTPException
+from fastapi import FastAPI, Depends,HTTPException,status
 from .models import User, get_db_session
-from .schema import UserRegistrationSchema,UserResponseSchema,UserLoginSchema,BaseResponseModel,EmailSchema
+from .schema import UserRegistrationSchema,UserResponseSchema,UserLoginSchema,BaseResponseModel,UserSchema
 from sqlalchemy.exc import SQLAlchemyError,IntegrityError
 from sqlalchemy.orm import Session
 from .utils import JwtUtils,PasswordUtils,EmailUtils,Audience
@@ -42,7 +42,7 @@ def register_user(user_payload: UserRegistrationSchema, db: Session = Depends(ge
         raise HTTPException(status_code=500, detail="An unexpected error occurred: " + str(e))
 
 
-@router.post('/login/',response_model=BaseResponseModel)
+@router.post('/login/')
 def login(user_payload: UserLoginSchema, db: Session = Depends(get_db_session)):
     try :
         user = db.query(User).filter_by(username=user_payload.username).first()
@@ -52,9 +52,12 @@ def login(user_payload: UserLoginSchema, db: Session = Depends(get_db_session)):
         if not user.is_verified:
             raise HTTPException(status_code=400,detail="User is Not Verified")
         
+        access_token = JwtUtils.create_token({"user_id": user.id,"aud":Audience.login.value})
+        
         return {
             "message": "Login successful",
-            "status" : 200
+            "status" : 200,
+            "access_token":access_token
         }
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500,detail=str(e))    
@@ -70,3 +73,9 @@ def verify_email(token: str,db:Session=Depends(get_db_session)):
         return {"message": "User Email Verified Successfully","status":200}
     return {"message":"User Not Found","status":404}
     
+@router.get("/fetchUser/",response_model=UserSchema,status_code=status.HTTP_200_OK,include_in_schema=False)
+def fetch_user(token:str,db:Session=Depends(get_db_session)):
+    payload=JwtUtils.decode_token(token=token,audience=Audience.login.value)
+    user_id=payload.get("user_id")
+    user=db.query(User).where(User.id==user_id).first()
+    return user

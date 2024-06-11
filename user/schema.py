@@ -34,3 +34,5 @@ class EmailSchema(BaseModel):
     subject: str
     body: str
      
+class UserSchema(UserRegistrationSchema):
+    id:int
