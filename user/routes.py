@@ -62,14 +62,12 @@ def login(user_payload: UserLoginSchema, db: Session = Depends(get_db_session)):
             
 @router.get('/verifyUser/')
 def verify_email(token: str,db:Session=Depends(get_db_session)):
-    try: 
-        payload = JwtUtils.decode_token(token=token, audience=Audience.register.value)
-        id = payload.get("id")
-        user = db.query(User).filter(User.id == id).first()
-        if user:
-            user.is_verified = True
-            db.commit()
-        return {"message": "User Email Verified Successfully", "id":id}
+    payload = JwtUtils.decode_token(token=token, audience=Audience.register.value)
+    user_id = payload.get("id")
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        user.is_verified = True
+        db.commit()   
+        return {"message": "User Email Verified Successfully","status":200}
+    return {"message":"User Not Found","status":404}
     
-    except HTTPException as e:
-        raise HTTPException(status_code=401, detail="Invalid or Expired Token")
