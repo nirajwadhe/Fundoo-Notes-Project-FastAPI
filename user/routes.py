@@ -27,7 +27,7 @@ def register_user(user_payload: UserRegistrationSchema, db: Session = Depends(ge
         )
         db.add(new_user)
         db.commit()
-        access_token = JwtUtils.create_token({"id": new_user.id,"aud":Audience.register.value})
+        access_token = JwtUtils.create_token({"id": new_user.user_id,"aud":Audience.register.value})
         EmailUtils.send_email(new_user.email,subject="VERIFICATION EMAIL",body=f"http://127.0.0.1:8000/verifyUser?token={access_token}")
         db.refresh(new_user)
         return {"message":"Registered Successfully",
@@ -63,8 +63,8 @@ def login(user_payload: UserLoginSchema, db: Session = Depends(get_db_session)):
 @router.get('/verifyUser/')
 def verify_email(token: str,db:Session=Depends(get_db_session)):
     payload = JwtUtils.decode_token(token=token, audience=Audience.register.value)
-    user_id = payload.get("id")
-    user = db.query(User).filter(User.id == user_id).first()
+    user_id = payload.get("user_id")
+    user = db.query(User).filter(User.user_id == user_id).first()
     if user:
         user.is_verified = True
         db.commit()   

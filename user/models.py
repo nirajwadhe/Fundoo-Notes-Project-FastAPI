@@ -26,7 +26,7 @@ class Base(DeclarativeBase):
 
 class User(Base):
     __tablename__ = "user"
-    id:Mapped[int] = mapped_column(BigInteger, autoincrement = True, index = True, primary_key = True)
+    user_id:Mapped[int] = mapped_column(BigInteger, autoincrement = True, index = True, primary_key = True)
     username:Mapped[str] = mapped_column(String(length = 50))
     password:Mapped[str] = mapped_column(String(length=250))
     first_name:Mapped[str] = mapped_column(String(length=50))
