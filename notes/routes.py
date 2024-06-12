@@ -20,7 +20,7 @@ def create_notes(request:Request,notes_payload:NotesCreationSchema,db:Session=De
         raise HTTPException(status_code=500,detail="An unexpected error occurred: " + str(e))
     return {"message":"Notes Added Successfully","status":200,"data":new_note}
 
-@routes.post("/notes/{notes_id}", response_model=List[NotesReadSchema])
+@routes.get("/notes/read_notes", response_model=List[NotesReadSchema])
 def read_notes_id(request: Request, db: Session = Depends(get_db_session)):
     notes = db.query(Notes).filter(Notes.user_id == request.state.user_id).all()
     if not notes:
