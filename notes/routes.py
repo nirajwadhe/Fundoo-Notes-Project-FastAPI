@@ -5,8 +5,11 @@ from .models import get_db_session,Notes,Labels
 from sqlalchemy.orm import Session
 from .notes_utils import auth_user
 from core.logger_config import logger
+from core import create_app
 
-routes = FastAPI(dependencies=[Security(APIKeyHeader(name="Authorization")),Depends(auth_user)])
+# routes = FastAPI(dependencies=[Security(APIKeyHeader(name="Authorization")),Depends(auth_user)])
+routes = create_app(name="notes",dependencies=[Security(APIKeyHeader(name="Authorization")),Depends(auth_user)])
+# routes.dependencies=[Security(APIKeyHeader(name="Authorization")),Depends(auth_user)]
 
 @routes.post("/notes/",response_model=NotesResponseSchema)
 def create_notes(request:Request,notes_payload:NotesCreationSchema,db:Session=Depends(get_db_session)):
