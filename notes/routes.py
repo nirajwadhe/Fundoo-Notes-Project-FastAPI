@@ -140,12 +140,12 @@ def create_labels(request:Request,labels_payload:LabelCreationSchema,db:Session=
     
 @routes.get("/labels/read_labels", response_model=LabelsListResponseSchema)
 def read_labels(request: Request, db: Session = Depends(get_db_session)):
-    notes = db.query(Labels).filter(Labels.user_id == request.state.user_id).all()
-    if not notes:
+    labels = db.query(Labels).filter(Labels.user_id == request.state.user_id).all()
+    if not labels:
         logger.warning("Labels Not Found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notes Not Found")
     logger.info("Labels Retrieved Successfully")
-    return {"message":"Get_Trash","status":200,"data":notes}    
+    return {"message":"Get_Trash","status":200,"data":labels}    
 
 @routes.put("/labels/{labels_id}", response_model=LabelResponseSchema)
 def update_note(request:Request, labels_id:int,label_payload:LabelCreationSchema, db: Session = Depends(get_db_session)):
