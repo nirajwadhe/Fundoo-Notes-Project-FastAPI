@@ -20,14 +20,12 @@ def create_notes(request:Request,notes_payload:NotesCreationSchema,db:Session=De
         raise HTTPException(status_code=500,detail="An unexpected error occurred: " + str(e))
     return {"message":"Notes Added Successfully","status":200,"data":new_note}
 
-@routes.get("/notes/read_notes", response_model=List[NotesReadSchema])
+@routes.get("/notes/read_notes", response_model=NotesListResponseSchema)
 def read_notes_id(request: Request, db: Session = Depends(get_db_session)):
     notes = db.query(Notes).filter(Notes.user_id == request.state.user_id).all()
     if not notes:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notes Not Found")
-    # print(type(notes))
-    # return {"message":"Note Fetched","status":200,"data":[NotesReadSchema.model_validate(note).model_dump() for note in notes]}
-    return notes
+    return {"message":"Get_Trash","status":200,"data":notes}
 
 @routes.put("/notes/{notes_id}", response_model=NotesResponseSchema)
 def update_note(request:Request, notes_id:int,notes_payload: NotesUpdateSchema, db: Session = Depends(get_db_session)):
@@ -93,18 +91,18 @@ def set_trash(request: Request, notes_id: int, trash: bool, db: Session = Depend
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: " + str(e))
     return {"message":"Archived status Chan ged", "status": 200, "data": note}
 
-@routes.get("/notes/archive", response_model=List[NotesListResponseSchema])
+@routes.get("/notes/archive", response_model=NotesListResponseSchema)
 def get_archive(request: Request,db: Session = Depends(get_db_session)):
     note = db.query(Notes).filter(Notes.user_id == request.state.user_id,Notes.is_archive == True,Notes.is_trash_bool==False).all()
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note Not Found")
-    return note
+    return {"message":"Get_Trash","status":200,"data":note}
 
-@routes.get("/notes/trash", response_model=List[NotesReadSchema])
+@routes.get("/notes/trash", response_model=NotesListResponseSchema)
 def get_trash(request: Request,db: Session = Depends(get_db_session)):
     note = db.query(Notes).filter(Notes.user_id == request.state.user_id,Notes.is_trash_bool == True).all()
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note Not Found")
-    return note
+    return {"message":"Get_Trash","status":200,"data":note}
         
     
