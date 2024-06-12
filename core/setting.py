@@ -10,5 +10,6 @@ class Settings(BaseSettings):
     PASSWORD:str
     SMTP_SERVER:str
     SMTP_PORT:int
+    USER_URL:str
 
 settings = Settings()    

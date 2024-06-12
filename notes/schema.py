@@ -28,9 +28,12 @@ class NotesReadSchema(BaseModel):
     is_archive: bool
     is_trash_bool: bool
     user_id: int
+    
+    class Config():
+        from_attributes=True
         
-# class NotesListResponseSchema(BaseResponseModel):
-#     data: List[NotesReadSchema]
+class NotesListResponseSchema(BaseResponseModel):
+    data: List[NotesReadSchema]
 
 class NotesUpdateSchema(BaseModel):
     title: Optional[str] = Field(None, max_length=255)

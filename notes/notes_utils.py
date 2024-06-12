@@ -1,11 +1,12 @@
 from fastapi import Request,HTTPException
 import requests
+from core.setting import settings
 
 def auth_user(request:Request):
     token = request.headers.get('Authorization')
     if not token:
         raise HTTPException(status_code=401, detail="Authorization token is missing")
-    response=requests.get(url="http://127.0.0.1:8000/fetchUser",params={"token":token})
+    response=requests.get(url=f"{settings.USER_URL}/fetchUser",params={"token":token})
     if response.status_code!=200:
         raise HTTPException(detail="User Authentication Failed",status_code=response.status_code)
 
