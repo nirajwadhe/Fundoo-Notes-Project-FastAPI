@@ -33,5 +33,11 @@ class Notes(Base):
     is_archive:Mapped[bool] = mapped_column(default=False)
     is_trash_bool:Mapped[bool] = mapped_column(default=False)
     user_id:Mapped[int] = mapped_column(BigInteger,nullable=False)
+    
+class Labels(Base):
+    __tablename__ = "labels"
+    labels_id: Mapped[int] = mapped_column(BigInteger, autoincrement=True, index=True, primary_key=True)
+    label_name: Mapped[str] = mapped_column(String(length=250))
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
   

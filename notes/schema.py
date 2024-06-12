@@ -13,8 +13,6 @@ class NotesCreationSchema(BaseModel):
     remainder: Optional[datetime] = None
     is_archive: bool
     is_trash_bool: bool
-    
-
 
 class NotesResponseSchema(BaseResponseModel):
     data: NotesCreationSchema
@@ -42,3 +40,22 @@ class NotesUpdateSchema(BaseModel):
     remainder: Optional[datetime] = None
     is_archive: Optional[bool] = None
     is_trash_bool: Optional[bool] = None    
+ 
+class LabelCreationSchema(BaseModel):
+    label_name: str
+
+class LabelsReadSchema(BaseModel):
+    labels_id: int
+    label_name: str
+    user_id: int
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+    
+class LabelResponseSchema(BaseResponseModel):
+    data: LabelsReadSchema
+
+class LabelsListResponseSchema(BaseResponseModel):
+    data: List[LabelsReadSchema]
