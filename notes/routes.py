@@ -4,12 +4,11 @@ from .schema import NotesCreationSchema,NotesResponseSchema,BaseResponseModel,No
 from .models import get_db_session,Notes,Labels
 from sqlalchemy.orm import Session
 from .notes_utils import auth_user
-from core.logger_config import logger
+from core.logger_config import logger_config,USER_LOG
 from core import create_app
 
-# routes = FastAPI(dependencies=[Security(APIKeyHeader(name="Authorization")),Depends(auth_user)])
 routes = create_app(name="notes",dependencies=[Security(APIKeyHeader(name="Authorization")),Depends(auth_user)])
-# routes.dependencies=[Security(APIKeyHeader(name="Authorization")),Depends(auth_user)]
+logger = logger_config(USER_LOG)
 
 @routes.post("/notes/",response_model=NotesResponseSchema)
 def create_notes(request:Request,notes_payload:NotesCreationSchema,db:Session=Depends(get_db_session)):
@@ -151,7 +150,7 @@ def read_labels(request: Request, db: Session = Depends(get_db_session)):
     return {"message":"Get_Trash","status":200,"data":labels}    
 
 @routes.put("/labels/{labels_id}", response_model=LabelResponseSchema)
-def update_note(request:Request, labels_id:int,label_payload:LabelCreationSchema, db: Session = Depends(get_db_session)):
+def update_label(request:Request, labels_id:int,label_payload:LabelCreationSchema, db: Session = Depends(get_db_session)):
     labels = db.query(Labels).filter(Labels.labels_id == labels_id,Labels.user_id==request.state.user_id).first()
     if not labels:
         logger.warning(f"Label with ID {labels_id} Not Found")
