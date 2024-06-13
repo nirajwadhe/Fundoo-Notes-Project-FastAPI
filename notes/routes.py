@@ -1,7 +1,7 @@
 from fastapi import FastAPI,Depends,HTTPException,status,Security,Request
 from fastapi.security import APIKeyHeader
 from .schema import NotesCreationSchema,NotesResponseSchema,BaseResponseModel,NotesUpdateSchema,NotesListResponseSchema,LabelCreationSchema,LabelsListResponseSchema,LabelResponseSchema
-from .models import get_db_session,Notes,Labels
+from .models import get_db_session,Notes,Labels,label_association
 from sqlalchemy.orm import Session
 from .notes_utils import auth_user
 from core.logger_config import logger_config,USER_LOG
@@ -183,3 +183,66 @@ def delete_labels(request:Request , labels_id:int,db:Session = Depends(get_db_se
         logger.error(f"Unexpected error while deleting label: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
     return {"message": "Labels Deleted Successfully", "status": 200, "data": label}
+
+@routes.post("/Label_Association/", response_model=BaseResponseModel)
+def associate_label(request: Request, notes_id: int, label_ids: str, db: Session = Depends(get_db_session)):
+    try:
+        logger.info("Associating labels %s with note %s", label_ids, notes_id)
+        
+        # Convert the comma separate string to a list of integers and convert to int
+        label_id_list = [int(label_id.strip()) for label_id in label_ids.split(",")]
+
+        # Lines below is used to fetching the notes from our given input
+        note = db.query(Notes).filter(Notes.notes_id==notes_id,Notes.user_id==request.state.user_id).first()
+        if not note:
+            logger.warning("Note not found: %s", notes_id)
+            raise HTTPException(status_code=404, detail="Note not found")
+
+        # Fetch the labels and associate with the note , labesl_id equated with ids in labels list
+        labels_list = db.query(Labels).filter(Labels.labels_id.in_(label_id_list)).all()
+        if not labels_list:
+            logger.warning("No valid labels found for the given IDs: %s", label_ids)
+            raise HTTPException(status_code=404, detail="No valid labels found")
+
+        for label in labels_list:
+            check = db.query(label_association).filter_by(notes_id=notes_id,labels_id=label.labels_id).first()
+            if check:
+                logger.info("This label is already associated")
+                continue
+            db.execute(label_association.insert().values(notes_id=notes_id, labels_id=label.labels_id))
+        db.commit()
+        logger.info("Labels associated successfully with note %s", notes_id)
+        return {"message": "Labels associated successfully", "status": 200}
+    
+    except HTTPException as e:
+        db.rollback()
+        logger.error("Database error during label association: %s", str(e))
+        raise HTTPException(status_code=500, detail="Database Error: " + str(e))   
+
+@routes.delete("/Labels_Association/{labels_id}", response_model=BaseResponseModel)
+def del_associated_labels(request:Request , labels_id: int, notes_id: int, db: Session = Depends(get_db_session)):
+    note = db.query(Notes).filter(Notes.notes_id==notes_id,Notes.user_id==request.state.user_id).first()
+    if not note:
+        logger.warning("Note not found: %s", notes_id)
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    label = db.query(Labels).filter(Notes.notes_id==notes_id,Notes.user_id==request.state.user_id).all()
+    if not label:
+        logger.warning("No valid labels found for the given IDs: %s", label)
+        raise HTTPException(status_code=404, detail="No valid labels found")
+    try:
+        logger.info(f"Attempted to delete label association: labels_id={labels_id}, notes_id={notes_id}")
+        db.execute(
+            label_association.delete().where(
+                label_association.c.labels_id == labels_id,
+                label_association.c.notes_id == notes_id
+            )
+        )
+        db.commit()
+        logger.info(f"Label association with labels_id={labels_id} and notes_id={notes_id} deleted successfully")
+        return {"message": "Label Association Deleted Successfully", "status": 200}
+    
+    except HTTPException as e:
+        db.rollback()
+        logger.error(f"Unexpected error while deleting label association: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
