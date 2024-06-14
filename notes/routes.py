@@ -3,7 +3,7 @@ from fastapi.security import APIKeyHeader
 from .schema import NotesCreationSchema,NotesResponseSchema,BaseResponseModel,NotesUpdateSchema,NotesListResponseSchema,LabelCreationSchema,LabelsListResponseSchema,LabelResponseSchema
 from .models import get_db_session,Notes,Labels,label_association
 from sqlalchemy.orm import Session
-from .notes_utils import auth_user
+from .notes_utils import auth_user,RedisManager
 from core.logger_config import logger_config,USER_LOG
 from core import create_app
 
@@ -13,10 +13,18 @@ logger = logger_config(USER_LOG)
 @routes.post("/notes/",response_model=NotesResponseSchema)
 def create_notes(request:Request,notes_payload:NotesCreationSchema,db:Session=Depends(get_db_session)):
     try:
-        new_note = Notes(**notes_payload.model_dump(),user_id=request.state.user_id)
+        # new_note = Notes(**notes_payload.model_dump(),user_id=request.state.user_id)
+        new_note = Notes(
+        title=notes_payload.title,
+        description=notes_payload.description,
+        color=notes_payload.color,
+        remainder=notes_payload.remainder,
+        user_id=request.state.user_id
+    )
         db.add(new_note)
         db.commit()
         db.refresh(new_note)
+        RedisManager.save(NotesCreationSchema.model_validate(new_note).model_dump())
         logger.info("Notes Created Succesfully!!")
     except HTTPException as e:
         db.rollback()
@@ -26,12 +34,21 @@ def create_notes(request:Request,notes_payload:NotesCreationSchema,db:Session=De
 
 @routes.get("/notes/read_notes", response_model=NotesListResponseSchema)
 def read_notes_id(request: Request, db: Session = Depends(get_db_session)):
-    notes = db.query(Notes).filter(Notes.user_id == request.state.user_id).all()
-    if not notes:
-        logger.warning("Notes Not Found")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notes Not Found")
-    logger.info("Notes Retrieved Successfully")
-    return {"message":"Get_Trash","status":200,"data":notes}
+    user_id = request.state.user_id
+    cache_notes = RedisManager.read(user_id = user_id)
+    if cache_notes:
+        return {"message":"Notes Data Retrived Successfully","status":200,"data":list(cache_notes)}
+    
+    try:
+        notes = db.query(Notes).filter(Notes.user_id == request.state.user_id).all()
+        if not notes:
+            logger.warning("Notes Not Found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notes Not Found")
+        logger.info("Notes Retrieved Successfully from Database")
+        return {"message": "Notes Retrieved Successfully from Database", "status": 200, "data": notes}
+    except Exception as e:
+        logger.error(f"Error retrieving notes from database: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error retrieving notes from database")
 
 @routes.put("/notes/{notes_id}", response_model=NotesResponseSchema)
 def update_note(request:Request, notes_id:int,notes_payload: NotesUpdateSchema, db: Session = Depends(get_db_session)):
@@ -45,6 +62,7 @@ def update_note(request:Request, notes_id:int,notes_payload: NotesUpdateSchema, 
     try:
         db.commit()
         db.refresh(notes)
+        RedisManager.save(NotesCreationSchema.model_validate(notes).model_dump())
         logger.info(f"Notes with ID {notes_id} Updated Successfully")
     except Exception as e:
         db.rollback()
@@ -61,6 +79,8 @@ def delete_note(request:Request , notes_id:int,db:Session = Depends(get_db_sessi
         db.delete(note)
         db.commit()
         logger.info(f"Notes with ID {notes_id} Deleted Successfully")
+        RedisManager.delete(request.state.user_id, str(notes_id))
+        
     except Exception as e:
         db.rollback()
         logger.error(f"Unexpected error while deleting note: {e}")
