@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends,HTTPException,status
 from .models import User, get_db_session
-from .schema import UserRegistrationSchema,UserResponseSchema,UserLoginSchema,BaseResponseModel,UserSchema
+from .schema import UserRegistrationSchema,UserResponseSchema,UserLoginSchema,BaseResponseModel,UserSchema,ForgetPasswordSchema,PasswordResponseSchema,NewPasswordSchema
 from sqlalchemy.exc import SQLAlchemyError,IntegrityError
 from sqlalchemy.orm import Session
 from .utils import JwtUtils,PasswordUtils,EmailUtils,Audience
@@ -89,3 +89,38 @@ def fetch_user(token:str,db:Session=Depends(get_db_session)):
     user=db.query(User).where(User.id==user_id).first()
     logger.info("User fetched: %s", user.username if user else "User not found")
     return user
+
+        
+@router.post('/ForgetPassword/')
+def forget_password(user_payload: ForgetPasswordSchema, db: Session = Depends(get_db_session)):
+    user = db.query(User).filter(User.email == user_payload.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User Not Found")
+    
+    access_token = JwtUtils.create_token({"user_id": user.id, "aud": Audience.register.value})
+    EmailUtils.send_email(user.email, subject="Password Reset", body=f"http://127.0.0.1:8000/ResetPassword/?token={access_token}")
+    return {"message": "Password reset email sent successfully"}
+
+@router.post('/ResetPassword/',response_model=BaseResponseModel)
+def new_password(token:str , payload: NewPasswordSchema, db: Session = Depends(get_db_session)):
+    if payload.confirm_password != payload.new_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+    
+    try:
+        payload_data = JwtUtils.decode_token(token=token, audience=Audience.register.value)
+        user_id = payload_data.get("user_id")
+        user = db.query(User).filter(User.id == user_id).first()
+        
+        if not user:
+            logger.warning(f"User with ID {user_id} not found")
+            raise HTTPException(status_code=404, detail="User not founds")
+        
+        user.password = PasswordUtils.get_password_hash(payload.new_password)
+        db.commit()
+        db.refresh(user)
+        return {"message": "Password changed successfully", "status": 200}
+    
+    except Exception as e:
+        db.rollback()
+        logger.error(f"An unexpected error occurred: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")

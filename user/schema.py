@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, ValidationError, field_validator,EmailStr
 import re
+from typing import Optional
 
 class BaseResponseModel(BaseModel):
     message:str
@@ -36,3 +37,22 @@ class EmailSchema(BaseModel):
      
 class UserSchema(UserRegistrationSchema):
     id:int
+    
+class ForgetPasswordSchema(BaseModel):
+    email:str
+
+class NewPasswordSchema(BaseModel):
+    new_password: str = Field(...,min_length=8, max_length=250,description="Minimun 8 long,1 Caps, 1 Special Character and 1 Num")
+    confirm_password : str = Field(...,min_length=8, max_length=250,description="Minimun 8 long,1 Caps, 1 Special Character and 1 Num")
+    @field_validator("new_password")
+    def validate_password(cls, value):
+        if len(value) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", value):
+            raise ValueError('Password must contain at least one special character')
+        if not re.search(r"\d", value):
+            raise ValueError('Password must contain at least one number')
+        return value
+    
+class PasswordResponseSchema(BaseResponseModel):
+    password : str
